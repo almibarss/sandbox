@@ -12,7 +12,6 @@ plugins {
 
     // Apply the application plugin to add support for building an application
     id 'application'
-		id 'kotlin'
 }
 
 repositories {
