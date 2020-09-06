@@ -1,6 +1,6 @@
 [![CircleCI](https://circleci.com/gh/mperezi/alfred-yaml.svg?style=svg)](https://circleci.com/gh/mperezi/alfred-yaml)
 
-# alfred-yaml
+# alfred-yaml-2
 
 [Alfred](https://www.alfredapp.com/) workflow to validate YAML documents
 
