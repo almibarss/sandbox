@@ -14,3 +14,4 @@ To restore the preferences for iTerm2 (version ≥ 3.3):
 
 ![iTerm2 Preferences dialog](alfred.png)
 
+I'm going to delete this branch after merging the PR
