@@ -1,0 +1,15 @@
+name: Say hello
+
+on: [push]
+
+jobs:
+  greet:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v2
+      - uses: ./.github/actions/say-hello
+        id: hello
+        with:
+          who-to-greet: ${{ github.actor }}
+      - name: Get the output time
+        run: echo "The time is ${{ steps.hello.outputs.time }}"
