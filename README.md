@@ -16,3 +16,4 @@ To restore the preferences for iTerm2 (version ≥ 3.3):
 
 I'm going to delete this branch after merging the PR
 new change
+ANOTHER change from co-worker
