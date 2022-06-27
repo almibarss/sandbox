@@ -11,15 +11,30 @@ jobs:
     runs-on: ubuntu-latest
     if: contains(github.event.comment.body, '/test-qa --kind integration')
     steps:
+      - name: Shell test
+        run: |
+          date
+          echo $(date)
+
       - name: Label PR
         uses: actions/github-script@v6
         with:
           script: |
-            console.log(context);
-            github.rest.issues.addLabels({
-                        owner: context.payload.repository.owner.login,
-                        repo: context.payload.repository.name,
-                        issue_number: context.payload.issue.number,
-                        labels: ["my-label"]
-                      })
+            console.log(github.event);
+            const repo = {
+              owner: "almibarss",
+              repo: context.payload.repository.name
+            }
+            const {data: { workflow_runs }} = await github.rest.actions.listWorkflowRunsForRepo({ ...repo })
+            const last_run = workflow_runs
+              .find((r) => r.name === "Test workflow no. 2"
+            && r.pull_requests.find((p) => p.number === context.payload.issue.number))
+            console.log(github.rest.actions)
+            console.log(last_run)
+            if (last_run.conclusion === "failure") {
+              await github.request('POST /repos/{owner}/{repo}/actions/runs/{run_id}/rerun', {
+                ...repo,
+                run_id: last_run.id
+              })
+            }
 
