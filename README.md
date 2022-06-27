@@ -1,6 +1,6 @@
 # MacOS
 
-## iTerm 3.0
+## iTerm 3.2
 
 To restore the preferences for iTerm2 (version ≥ 3.3):
 
