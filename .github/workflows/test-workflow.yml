@@ -1,0 +1,56 @@
+---
+name: Test workflow no. 2
+
+on: [pull_request]
+
+jobs:
+  check-it:
+    name: Verify ITs
+    runs-on: [ubuntu-latest]
+    steps:
+      - name: Find last IT run
+        id: find-last-it-run
+        uses: actions/github-script@v6
+        with:
+          script: |
+            core.warning("this is a warning");
+            const { data: comments } = await github.rest.issues.listComments({
+                        issue_number: context.payload.pull_request.number,
+                        owner: "almibarss",
+                        repo: context.payload.repository.name
+                      })
+
+            const it_run_dates = comments
+              .filter((c) => c.body === "/test-qa --kind integration")
+              .map((c) => c.updated_at)
+              .map((d) => new Date(d))
+              .sort((d1, d2) => d2.getTime() - d1.getTime());
+
+            if (it_run_dates.length > 0) {
+              const last_it_run = it_run_dates[0];
+              core.setOutput("date", last_it_run.toISOString());
+              console.log(`Last IT run: ${last_it_run}`);
+            } else {
+              core.setFailed("There aren't any execution of integration tests in this PR");
+            }
+
+      - name: Find commits after last IT run
+        uses: actions/github-script@v6
+        env:
+          LAST_IT_RUN: ${{ steps.find-last-it-run.outputs.date }}
+        with:
+          script: |
+            const { data: commits } = await github.rest.pulls.listCommits({
+                        pull_number: context.payload.pull_request.number,
+                        owner: "almibarss",
+                        repo: context.payload.repository.name
+                      })
+            const commits_by_date = commits
+              .map((c) => c.commit.committer.date)
+              .map((d) => new Date(d))
+              .sort((d1, d2) => d2.getTime() - d1.getTime());  // reverse order !!
+            const last_commit_date = commits_by_date[0];
+            console.log(`Last commit date: ${last_commit_date}`);
+            if (last_commit_date > new Date(process.env.LAST_IT_RUN)) {
+              core.setFailed("Some commits have been pushed without running ITs");
+            }
