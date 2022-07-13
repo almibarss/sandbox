@@ -10,7 +10,7 @@ To restore the preferences for iTerm2 (version ≥ 3.3):
 
 ![iTerm2 Preferences dialog](iterm2.png)
 
-## Alfred 2
+## Alfred 4
 
 ![iTerm2 Preferences dialog](alfred.png)
 
