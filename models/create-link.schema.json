@@ -1,7 +1,7 @@
 {
   "$schema": "http://json-schema.org/draft-04/schema#",
   "title": "create-link",
-  "description": "Create link request model (authenticated)",
+  "description": "Create link request model",
   "type": "object",
   "required": [ "origin" ],
   "properties": {

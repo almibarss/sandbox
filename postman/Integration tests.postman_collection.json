@@ -7,230 +7,286 @@
 	},
 	"item": [
 		{
-			"name": "an anonymous user",
+			"name": "AWS auth",
 			"item": [
 				{
-					"name": "is unauthorized to",
-					"item": [
+					"name": "Create user",
+					"event": [
 						{
-							"name": "create a custom link",
-							"event": [
-								{
-									"listen": "prerequest",
-									"script": {
-										"exec": [
-											""
-										],
-										"type": "text/javascript"
-									}
-								},
-								{
-									"listen": "test",
-									"script": {
-										"exec": [
-											""
-										],
-										"type": "text/javascript"
-									}
-								}
-							],
-							"request": {
-								"method": "POST",
-								"header": [],
-								"body": {
-									"mode": "raw",
-									"raw": "{\n    \"origin\": \"https://www.google.com\",\n    \"backhalf\": \"google\"\n}",
-									"options": {
-										"raw": {
-											"language": "json"
-										}
-									}
-								},
-								"url": {
-									"raw": "{{baseUrl}}/links",
-									"host": [
-										"{{baseUrl}}"
-									],
-									"path": [
-										"links"
-									]
-								}
-							},
-							"response": []
-						},
-						{
-							"name": "list any links",
-							"event": [
-								{
-									"listen": "prerequest",
-									"script": {
-										"exec": [
-											""
-										],
-										"type": "text/javascript"
-									}
-								},
-								{
-									"listen": "test",
-									"script": {
-										"exec": [
-											""
-										],
-										"type": "text/javascript"
-									}
-								}
-							],
-							"request": {
-								"method": "GET",
-								"header": [],
-								"url": {
-									"raw": "{{baseUrl}}/links",
-									"host": [
-										"{{baseUrl}}"
-									],
-									"path": [
-										"links"
-									]
-								}
-							},
-							"response": []
-						},
-						{
-							"name": "delete any link",
-							"event": [
-								{
-									"listen": "prerequest",
-									"script": {
-										"exec": [
-											""
-										],
-										"type": "text/javascript"
-									}
-								},
-								{
-									"listen": "test",
-									"script": {
-										"exec": [
-											""
-										],
-										"type": "text/javascript"
-									}
-								}
-							],
-							"request": {
-								"method": "DELETE",
-								"header": [
-									{
-										"key": "Content-Type",
-										"value": "application/json",
-										"type": "text"
-									}
+							"listen": "test",
+							"script": {
+								"exec": [
+									"if (pm.response.code === 200) {",
+									"    pm.test(`User ${pm.variables.get(\"testEmail\")} created`, function() {})",
+									"}",
+									"",
+									"if (pm.response.code === 400) {",
+									"    pm.test(`User ${pm.variables.get(\"testEmail\")} already exists`, function() {",
+									"        postman.setNextRequest(null)",
+									"        pm.expect(pm.response.json()).to.have.property('__type', 'UsernameExistsException');",
+									"        postman.setNextRequest()",
+									"    });",
+									"}"
 								],
-								"url": {
-									"raw": "{{baseUrl}}/links/:backhalf",
-									"host": [
-										"{{baseUrl}}"
-									],
-									"path": [
-										"links",
-										":backhalf"
-									],
-									"variable": [
-										{
-											"key": "backhalf",
-											"value": "google"
-										}
-									]
-								}
-							},
-							"response": []
+								"type": "text/javascript"
+							}
+						},
+						{
+							"listen": "prerequest",
+							"script": {
+								"exec": [
+									"if (!pm.variables.has(\"userNo\")) {",
+									"    console.log(\"** AWS AUTH BEGIN **\")",
+									"    pm.variables.set(\"userNo\", 0)",
+									"}",
+									"",
+									"const userNo = pm.variables.get(\"userNo\")",
+									"test.postman(pm)",
+									"test.user(userNo).setActive()"
+								],
+								"type": "text/javascript"
+							}
 						}
 					],
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "X-Amz-Target",
+								"value": "AWSCognitoIdentityProviderService.AdminCreateUser",
+								"type": "text"
+							},
+							{
+								"key": "Content-Type",
+								"value": "application/x-amz-json-1.1",
+								"type": "text"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n    \"TemporaryPassword\": \"{{testPassword}}\",\n    \"MessageAction\": \"SUPPRESS\",\n    \"UserAttributes\": [ \n        { \n            \"Name\": \"email\",\n            \"Value\": \"{{testEmail}}\"\n        }\n    ],\n    \"Username\": \"{{testUser}}\",\n    \"UserPoolId\": \"{{cognitoUserPoolId}}\"\n}\n",
+							"options": {
+								"raw": {
+									"language": "json"
+								}
+							}
+						},
+						"url": {
+							"raw": "https://cognito-idp.{{awsRegion}}.amazonaws.com/",
+							"protocol": "https",
+							"host": [
+								"cognito-idp",
+								"{{awsRegion}}",
+								"amazonaws",
+								"com"
+							],
+							"path": [
+								""
+							]
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "Initiate auth",
+					"event": [
+						{
+							"listen": "test",
+							"script": {
+								"exec": [
+									"test.postman(pm)",
+									"const jsonData = pm.response.json()",
+									"const userNo = pm.variables.get(\"userNo\")",
+									"const user = test.user(userNo)",
+									"",
+									"pm.test(`Status code is 200`, function() {",
+									"    postman.setNextRequest(null)",
+									"    pm.response.to.have.status(200);",
+									"    postman.setNextRequest()",
+									"});",
+									"",
+									"if (jsonData.ChallengeName) {",
+									"    pm.test(\"Auth challenge response required\", function() {",
+									"        postman.setNextRequest(null)",
+									"        pm.expect(jsonData).to.have.property(\"ChallengeName\", \"NEW_PASSWORD_REQUIRED\")",
+									"        pm.expect(jsonData).to.have.property(\"Session\")",
+									"        pm.variables.set(\"awsAuthSession\", jsonData.Session)",
+									"        postman.setNextRequest()",
+									"    })",
+									"} else {",
+									"    pm.test(`User ${user.email} logged in`, function() {",
+									"        postman.setNextRequest(null)",
+									"        pm.expect(jsonData).to.deep.nested.property('AuthenticationResult.IdToken')",
+									"        user.setIdToken(jsonData.AuthenticationResult.IdToken)",
+									"        postman.setNextRequest()",
+									"    })",
+									"}",
+									""
+								],
+								"type": "text/javascript"
+							}
+						},
+						{
+							"listen": "prerequest",
+							"script": {
+								"exec": [
+									""
+								],
+								"type": "text/javascript"
+							}
+						}
+					],
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "X-Amz-Target",
+								"value": "AWSCognitoIdentityProviderService.InitiateAuth",
+								"type": "text"
+							},
+							{
+								"key": "Content-Type",
+								"value": "application/x-amz-json-1.1",
+								"type": "text"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n    \"AuthFlow\": \"USER_PASSWORD_AUTH\",\n    \"ClientId\": \"{{cognitoClientId}}\",\n    \"AuthParameters\": {\n        \"USERNAME\": \"{{testUser}}\",\n        \"PASSWORD\": \"{{testPassword}}\"\n    }\n}\n",
+							"options": {
+								"raw": {
+									"language": "json"
+								}
+							}
+						},
+						"url": {
+							"raw": "https://cognito-idp.{{awsRegion}}.amazonaws.com/",
+							"protocol": "https",
+							"host": [
+								"cognito-idp",
+								"{{awsRegion}}",
+								"amazonaws",
+								"com"
+							],
+							"path": [
+								""
+							]
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "Respond to auth challenge",
 					"event": [
 						{
 							"listen": "prerequest",
 							"script": {
-								"type": "text/javascript",
 								"exec": [
-									""
-								]
+									"test.postman(pm)",
+									"if (!pm.variables.has(\"awsAuthSession\")) {",
+									"    test.skipCurrentRequest()",
+									"}"
+								],
+								"type": "text/javascript"
 							}
 						},
 						{
 							"listen": "test",
 							"script": {
-								"type": "text/javascript",
 								"exec": [
-									"pm.test(\"Status code is 401\", function() {",
-									"    pm.response.to.have.status(401);",
-									"});"
-								]
+									"test.postman(pm)",
+									"const jsonData = pm.response.json()",
+									"const userNo = pm.variables.get(\"userNo\")",
+									"const user = test.user(userNo)",
+									"const authChallengeWasRequired = pm.variables.has(\"awsAuthSession\")",
+									"",
+									"test.runIf(authChallengeWasRequired, `User ${user.email} logged in`, function() {",
+									"    postman.setNextRequest(null)",
+									"    pm.response.to.have.status(200);",
+									"    pm.expect(jsonData).to.deep.nested.property('AuthenticationResult.IdToken')",
+									"    user.setIdToken(jsonData.AuthenticationResult.IdToken)",
+									"    postman.setNextRequest()",
+									"});",
+									"",
+									"if (test.user(userNo + 1) !== undefined) {",
+									"   pm.variables.set(\"userNo\", userNo + 1)",
+									"   pm.variables.unset(\"awsAuthSession\")",
+									"   postman.setNextRequest(\"Create user\")",
+									"} else {",
+									"    pm.variables.unset(\"userNo\")",
+									"    console.log(\"** AWS AUTH END **\")",
+									"}",
+									"",
+									""
+								],
+								"type": "text/javascript"
 							}
 						}
-					]
-				},
-				{
-					"name": "is authorized to",
-					"item": [
-						{
-							"name": "create a link",
-							"event": [
-								{
-									"listen": "prerequest",
-									"script": {
-										"exec": [
-											""
-										],
-										"type": "text/javascript"
-									}
-								},
-								{
-									"listen": "test",
-									"script": {
-										"exec": [
-											"pm.test(\"Status code is 201\", function() {",
-											"    pm.response.to.have.status(201);",
-											"});",
-											"",
-											"pm.test(\"Response is a valid link\", function() {",
-											"    const requestData = JSON.parse(request.data);",
-											"    testUtils.assertValidLinkInResponse({ origin: requestData.origin }, pm);",
-											"});"
-										],
-										"type": "text/javascript"
-									}
-								}
-							],
-							"request": {
-								"method": "POST",
-								"header": [],
-								"body": {
-									"mode": "raw",
-									"raw": "{\n    \"origin\": \"https://www.google.com\"\n}",
-									"options": {
-										"raw": {
-											"language": "json"
-										}
-									}
-								},
-								"url": {
-									"raw": "{{baseUrl}}/public/links",
-									"host": [
-										"{{baseUrl}}"
-									],
-									"path": [
-										"public",
-										"links"
-									]
-								}
+					],
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "X-Amz-Target",
+								"value": "AWSCognitoIdentityProviderService.RespondToAuthChallenge",
+								"type": "text"
 							},
-							"response": []
+							{
+								"key": "Content-Type",
+								"value": "application/x-amz-json-1.1",
+								"type": "text"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n    \"ClientId\": \"{{cognitoClientId}}\",\n    \"ChallengeName\": \"NEW_PASSWORD_REQUIRED\",\n    \"Session\": \"{{awsAuthSession}}\",\n    \"ChallengeResponses\": {\n        \"USERNAME\": \"{{testUser}}\",\n        \"NEW_PASSWORD\": \"{{testPassword}}\"\n    }\n}\n",
+							"options": {
+								"raw": {
+									"language": "json"
+								}
+							}
+						},
+						"url": {
+							"raw": "https://cognito-idp.{{awsRegion}}.amazonaws.com/",
+							"protocol": "https",
+							"host": [
+								"cognito-idp",
+								"{{awsRegion}}",
+								"amazonaws",
+								"com"
+							],
+							"path": [
+								""
+							]
 						}
-					]
+					},
+					"response": []
 				}
 			],
 			"auth": {
-				"type": "noauth"
+				"type": "awsv4",
+				"awsv4": [
+					{
+						"key": "secretKey",
+						"value": "{{secretAccessKey}}",
+						"type": "string"
+					},
+					{
+						"key": "accessKey",
+						"value": "{{accessKey}}",
+						"type": "string"
+					},
+					{
+						"key": "service",
+						"value": "cognito-idp",
+						"type": "string"
+					},
+					{
+						"key": "region",
+						"value": "{{awsRegion}}",
+						"type": "string"
+					}
+				]
 			},
 			"event": [
 				{
@@ -254,7 +310,7 @@
 			]
 		},
 		{
-			"name": "an authenticated user",
+			"name": "a granted user",
 			"item": [
 				{
 					"name": "when creating a custom link",
@@ -275,6 +331,8 @@
 									"listen": "test",
 									"script": {
 										"exec": [
+											"test.postman(pm)",
+											"",
 											"pm.test(\"Status code is 201\", function() {",
 											"    pm.response.to.have.status(201);",
 											"});",
@@ -282,12 +340,11 @@
 											"pm.test(\"Response is a valid link\", function() {",
 											"    const response = pm.response.json();",
 											"    const requestData = JSON.parse(request.data);",
-											"    testUtils.assertValidCustomLink(response, {",
+											"    test.assertValidCustomLink(response, {",
 											"        origin: requestData.origin,",
 											"        backhalf: requestData.backhalf,",
-											"        user: pm.variables.get('testUserEmail')",
-											"    },",
-											"    pm);",
+											"        user: test.user(0).email",
+											"    });",
 											"});"
 										],
 										"type": "text/javascript"
@@ -334,12 +391,14 @@
 									"listen": "test",
 									"script": {
 										"exec": [
+											"test.postman(pm)",
+											"",
 											"pm.test(\"Status code is 400\", function() {",
 											"    pm.response.to.have.status(400);",
 											"});",
 											"",
 											"pm.test(\"Response is an error\", function() {",
-											"    testUtils.assertValidErrorResponse(/url is invalid/i, pm);",
+											"    test.assertValidErrorResponse(/url is invalid/i);",
 											"});"
 										],
 										"type": "text/javascript"
@@ -386,12 +445,14 @@
 									"listen": "test",
 									"script": {
 										"exec": [
+											"test.postman(pm)",
+											"",
 											"pm.test(\"Status code is 400\", function() {",
 											"    pm.response.to.have.status(400);",
 											"});",
 											"",
 											"pm.test(\"Response is an error\", function() {",
-											"    testUtils.assertValidErrorResponse(/does not match/i, pm);",
+											"    test.assertValidErrorResponse(/does not match/i);",
 											"});"
 										],
 										"type": "text/javascript"
@@ -438,13 +499,15 @@
 									"listen": "test",
 									"script": {
 										"exec": [
+											"test.postman(pm)",
+											"",
 											"pm.test(\"Status code is 400\", function() {",
 											"    pm.response.to.have.status(400);",
 											"});",
 											"",
 											"pm.test(\"Response is an error\", function() {",
-											"    testUtils.assertValidErrorResponse(/too short/i, pm);",
-											"    testUtils.assertValidErrorResponse(/range/i, pm);",
+											"    test.assertValidErrorResponse(/too short/i);",
+											"    test.assertValidErrorResponse(/range/i);",
 											"});"
 										],
 										"type": "text/javascript"
@@ -491,13 +554,15 @@
 									"listen": "test",
 									"script": {
 										"exec": [
+											"test.postman(pm)",
+											"",
 											"pm.test(\"Status code is 400\", function() {",
 											"    pm.response.to.have.status(400);",
 											"});",
 											"",
 											"pm.test(\"Response is an error\", function() {",
-											"    testUtils.assertValidErrorResponse(/too long/i, pm);",
-											"    testUtils.assertValidErrorResponse(/range/i, pm);",
+											"    test.assertValidErrorResponse(/too long/i);",
+											"    test.assertValidErrorResponse(/range/i);",
 											"});"
 										],
 										"type": "text/javascript"
@@ -535,7 +600,9 @@
 									"listen": "prerequest",
 									"script": {
 										"exec": [
-											"api.createLink('https://www.bing.com', pm)"
+											"test.postman(pm)",
+											"test.before()",
+											"test.user(1).createLink('https://www.bing.com')"
 										],
 										"type": "text/javascript"
 									}
@@ -544,12 +611,14 @@
 									"listen": "test",
 									"script": {
 										"exec": [
+											"test.postman(pm)",
+											"",
 											"pm.test(\"Status code is 400\", function() {",
 											"    pm.response.to.have.status(400);",
 											"});",
 											"",
 											"pm.test(\"Response is an error\", function() {",
-											"    testUtils.assertValidErrorResponse(/already taken/i, pm);",
+											"    test.assertValidErrorResponse(/already taken/i);",
 											"});"
 										],
 										"type": "text/javascript"
@@ -612,7 +681,10 @@
 									"listen": "prerequest",
 									"script": {
 										"exec": [
-											"api.createCustomLink('https://www.google.com', 'test-link-HMGeUdkrz2', pm);"
+											"test.postman(pm)",
+											"test.before()",
+											"test.user(0).createLink('https://www.google.com', 'test-link-HMGeUdkrz2')",
+											"test.user(1).createLink('https://www.bing.com', 'test-link-JMG0Uskrz3')"
 										],
 										"type": "text/javascript"
 									}
@@ -621,25 +693,30 @@
 									"listen": "test",
 									"script": {
 										"exec": [
+											"test.postman(pm)",
+											"",
 											"pm.test(\"Status code is 200\", function() {",
 											"    pm.response.to.have.status(200);",
 											"});",
 											"",
 											"pm.test(\"Response is a list of links\", function() {",
 											"    const response = pm.response.json();",
-											"    const user = pm.variables.get('testUserEmail');",
+											"    const user = pm.variables.get('testEmail');",
 											"    pm.expect(response)",
 											"        .to.be.an('object')",
 											"        .and.to.have.property('data')",
 											"            .to.be.an('array')",
 											"            .and.to.be.length(1);",
-											"    testUtils.assertValidCustomLink(response.data[0], {",
+											"    test.assertValidCustomLink(response.data[0], {",
 											"        origin: 'https://www.google.com',",
 											"        backhalf: 'test-link-HMGeUdkrz2',",
 											"        user: user",
 											"    },",
 											"    pm);",
-											"});"
+											"});",
+											"",
+											"test.after()",
+											"test.user(1).deleteAll()"
 										],
 										"type": "text/javascript"
 									}
@@ -672,7 +749,9 @@
 									"listen": "prerequest",
 									"script": {
 										"exec": [
-											"api.createCustomLink('https://wwww.google.com', 'test-link-HMGeUdkrz2', pm);"
+											"test.postman(pm)",
+											"test.before()",
+											"test.user(0).createLink('https://wwww.google.com', 'test-link-HMGeUdkrz2')"
 										],
 										"type": "text/javascript"
 									}
@@ -733,12 +812,14 @@
 									"listen": "test",
 									"script": {
 										"exec": [
+											"test.postman(pm)",
+											"",
 											"pm.test(\"Status code is 403\", function() {",
 											"    pm.response.to.have.status(403);",
 											"});",
 											"",
 											"pm.test(\"Response is an error\", function() {",
-											"    testUtils.assertValidErrorResponse(/cannot be deleted/i, pm);",
+											"    test.assertValidErrorResponse(/cannot be deleted/i);",
 											"});"
 										],
 										"type": "text/javascript"
@@ -780,7 +861,9 @@
 									"listen": "prerequest",
 									"script": {
 										"exec": [
-											"api.createLink('https://wwww.google.com', pm);"
+											"test.postman(pm)",
+											"test.before()",
+											"test.user(1).createLink('https://wwww.google.com')"
 										],
 										"type": "text/javascript"
 									}
@@ -789,13 +872,18 @@
 									"listen": "test",
 									"script": {
 										"exec": [
+											"test.postman(pm)",
+											"",
 											"pm.test(\"Status code is 403\", function() {",
 											"    pm.response.to.have.status(403);",
 											"});",
 											"",
 											"pm.test(\"Response is an error\", function() {",
-											"    testUtils.assertValidErrorResponse(/cannot be deleted/i, pm);",
-											"});"
+											"    test.assertValidErrorResponse(/cannot be deleted/i);",
+											"});",
+											"",
+											"test.after()",
+											"test.user(1).deleteAll()"
 										],
 										"type": "text/javascript"
 									}
@@ -841,7 +929,8 @@
 									"listen": "prerequest",
 									"script": {
 										"exec": [
-											"api.createCustomLink('https://www.google.com', 'test-link-HMGeUdkrz2', pm);"
+											"test.postman(pm)",
+											"test.user(0).createLink('https://www.google.com', 'test-link-HMGeUdkrz2')"
 										],
 										"type": "text/javascript"
 									}
@@ -850,18 +939,19 @@
 									"listen": "test",
 									"script": {
 										"exec": [
+											"test.postman(pm)",
+											"",
 											"pm.test(\"Status code is 200\", function() {",
 											"    pm.response.to.have.status(200);",
 											"});",
 											"",
 											"pm.test(\"Response is a valid link\", function() {",
 											"    const requestData = JSON.parse(request.data);",
-											"    testUtils.assertValidUpdatedLinkInResponse({",
+											"    test.assertValidUpdatedLinkInResponse({",
 											"        origin: 'https://www.google.com',",
 											"        backhalf: requestData.backhalf,",
-											"        user: pm.variables.get('testUserEmail')",
-											"    },",
-											"    pm);",
+											"        user: test.user(0).email",
+											"    });",
 											"});"
 										],
 										"type": "text/javascript"
@@ -907,7 +997,8 @@
 									"listen": "prerequest",
 									"script": {
 										"exec": [
-											"api.createCustomLink('https://www.google.com', 'test-link-HMGeUdkrz2', pm);"
+											"test.postman(pm)",
+											"test.user(0).createLink('https://www.google.com', 'test-link-HMGeUdkrz2')"
 										],
 										"type": "text/javascript"
 									}
@@ -916,18 +1007,19 @@
 									"listen": "test",
 									"script": {
 										"exec": [
+											"test.postman(pm)",
+											"",
 											"pm.test(\"Status code is 200\", function() {",
 											"    pm.response.to.have.status(200);",
 											"});",
 											"",
 											"pm.test(\"Response is a valid link\", function() {",
 											"    const requestData = JSON.parse(request.data);",
-											"    testUtils.assertValidUpdatedLinkInResponse({",
+											"    test.assertValidUpdatedLinkInResponse({",
 											"        origin: requestData.origin,",
 											"        backhalf: 'test-link-HMGeUdkrz2',",
-											"        user: pm.variables.get('testUserEmail')",
-											"    },",
-											"    pm);",
+											"        user: test.user(0).email",
+											"    });",
 											"});"
 										],
 										"type": "text/javascript"
@@ -973,7 +1065,8 @@
 									"listen": "prerequest",
 									"script": {
 										"exec": [
-											"api.createCustomLink('https://www.google.com', 'test-link-HMGeUdkrz2', pm);"
+											"test.postman(pm)",
+											"test.user(0).createLink('https://www.google.com', 'test-link-HMGeUdkrz2')"
 										],
 										"type": "text/javascript"
 									}
@@ -982,12 +1075,14 @@
 									"listen": "test",
 									"script": {
 										"exec": [
+											"test.postman(pm)",
+											"",
 											"pm.test(\"Status code is 400\", function() {",
 											"    pm.response.to.have.status(400);",
 											"});",
 											"",
 											"pm.test(\"Response is an error\", function() {",
-											"    testUtils.assertValidErrorResponse(/is invalid/i, pm);",
+											"    test.assertValidErrorResponse(/is invalid/i);",
 											"});"
 										],
 										"type": "text/javascript"
@@ -1033,7 +1128,8 @@
 									"listen": "prerequest",
 									"script": {
 										"exec": [
-											"api.createCustomLink('https://www.google.com', 'test-link-HMGeUdkrz2', pm);"
+											"test.postman(pm)",
+											"test.user(0).createLink('https://www.google.com', 'test-link-HMGeUdkrz2')"
 										],
 										"type": "text/javascript"
 									}
@@ -1042,12 +1138,14 @@
 									"listen": "test",
 									"script": {
 										"exec": [
+											"test.postman(pm)",
+											"",
 											"pm.test(\"Status code is 400\", function() {",
 											"    pm.response.to.have.status(400);",
 											"});",
 											"",
 											"pm.test(\"Response is an error\", function() {",
-											"    testUtils.assertValidErrorResponse(/does not match/i, pm);",
+											"    test.assertValidErrorResponse(/does not match/i);",
 											"});"
 										],
 										"type": "text/javascript"
@@ -1102,12 +1200,14 @@
 									"listen": "test",
 									"script": {
 										"exec": [
+											"test.postman(pm)",
+											"",
 											"pm.test(\"Status code is 403\", function() {",
 											"    pm.response.to.have.status(403);",
 											"});",
 											"",
 											"pm.test(\"Response is an error\", function() {",
-											"    testUtils.assertValidErrorResponse(/cannot be edited/i, pm);",
+											"    test.assertValidErrorResponse(/cannot be edited/i);",
 											"});"
 										],
 										"type": "text/javascript"
@@ -1153,7 +1253,8 @@
 									"listen": "prerequest",
 									"script": {
 										"exec": [
-											"api.createLink('https://www.google.com', pm);"
+											"test.postman(pm)",
+											"test.user(1).createLink('https://www.google.com')"
 										],
 										"type": "text/javascript"
 									}
@@ -1162,13 +1263,18 @@
 									"listen": "test",
 									"script": {
 										"exec": [
+											"test.postman(pm)",
+											"",
 											"pm.test(\"Status code is 403\", function() {",
 											"    pm.response.to.have.status(403);",
 											"});",
 											"",
 											"pm.test(\"Response is an error\", function() {",
-											"    testUtils.assertValidErrorResponse(/cannot be edited/i, pm);",
-											"});"
+											"    test.assertValidErrorResponse(/cannot be edited/i);",
+											"});",
+											"",
+											"test.after()",
+											"test.user(1).deleteAll()"
 										],
 										"type": "text/javascript"
 									}
@@ -1213,8 +1319,9 @@
 									"listen": "prerequest",
 									"script": {
 										"exec": [
-											"api.createLink('https://www.bing.com', pm);",
-											"api.createCustomLink('https://www.google.com', 'google-HMGeUdkrz2', pm);"
+											"test.postman(pm)",
+											"test.user(0).createLink('https://www.google.com', 'google-HMGeUdkrz2')",
+											"test.user(1).createLink('https://www.google.com', 'taken')"
 										],
 										"type": "text/javascript"
 									}
@@ -1223,14 +1330,15 @@
 									"listen": "test",
 									"script": {
 										"exec": [
+											"test.postman(pm)",
+											"",
 											"pm.test(\"Status code is 400\", function() {",
 											"    pm.response.to.have.status(400);",
 											"});",
 											"",
 											"pm.test(\"Response is an error\", function() {",
-											"    testUtils.assertValidErrorResponse(/already taken/i, pm);",
-											"});",
-											";"
+											"    test.assertValidErrorResponse(/already taken/i);",
+											"});"
 										],
 										"type": "text/javascript"
 									}
@@ -1247,7 +1355,7 @@
 								],
 								"body": {
 									"mode": "raw",
-									"raw": "{\n    \"backhalf\": \"{{createdLink}}\"\n}"
+									"raw": "{\n    \"backhalf\": \"taken\"\n}"
 								},
 								"url": {
 									"raw": "{{baseUrl}}/links/:backhalf",
@@ -1271,8 +1379,385 @@
 					]
 				}
 			],
+			"event": [
+				{
+					"listen": "prerequest",
+					"script": {
+						"type": "text/javascript",
+						"exec": [
+							"test.postman(pm)",
+							"test.before()",
+							"const user = test.user(0)",
+							"user.setActive()",
+							"user.deleteAll()"
+						]
+					}
+				},
+				{
+					"listen": "test",
+					"script": {
+						"type": "text/javascript",
+						"exec": [
+							""
+						]
+					}
+				}
+			]
+		},
+		{
+			"name": "a non granted user",
+			"item": [
+				{
+					"name": "should not be able to delete a link",
+					"event": [
+						{
+							"listen": "prerequest",
+							"script": {
+								"exec": [
+									""
+								],
+								"type": "text/javascript"
+							}
+						},
+						{
+							"listen": "test",
+							"script": {
+								"exec": [
+									"test.postman(pm)",
+									"",
+									"pm.test(\"Status code is 403\", function() {",
+									"    pm.response.to.have.status(403);",
+									"});",
+									"",
+									"pm.test(\"Response is an error\", function() {",
+									"    test.assertValidErrorResponse(/access denied/i);",
+									"});"
+								],
+								"type": "text/javascript"
+							}
+						}
+					],
+					"request": {
+						"method": "DELETE",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json",
+								"type": "text"
+							}
+						],
+						"url": {
+							"raw": "{{baseUrl}}/links/:backhalf",
+							"host": [
+								"{{baseUrl}}"
+							],
+							"path": [
+								"links",
+								":backhalf"
+							],
+							"variable": [
+								{
+									"key": "backhalf",
+									"value": "test-link-HMGeUdkrz2"
+								}
+							]
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "should not be able to list links",
+					"event": [
+						{
+							"listen": "prerequest",
+							"script": {
+								"exec": [
+									""
+								],
+								"type": "text/javascript"
+							}
+						},
+						{
+							"listen": "test",
+							"script": {
+								"exec": [
+									"test.postman(pm)",
+									"",
+									"pm.test(\"Status code is 403\", function() {",
+									"    pm.response.to.have.status(403);",
+									"});",
+									"",
+									"pm.test(\"Response is an error\", function() {",
+									"    test.assertValidErrorResponse(/access denied/i);",
+									"});"
+								],
+								"type": "text/javascript"
+							}
+						}
+					],
+					"request": {
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{baseUrl}}/links",
+							"host": [
+								"{{baseUrl}}"
+							],
+							"path": [
+								"links"
+							]
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "should not be able to create links",
+					"event": [
+						{
+							"listen": "prerequest",
+							"script": {
+								"exec": [
+									""
+								],
+								"type": "text/javascript"
+							}
+						},
+						{
+							"listen": "test",
+							"script": {
+								"exec": [
+									"test.postman(pm)",
+									"",
+									"pm.test(\"Status code is 403\", function() {",
+									"    pm.response.to.have.status(403);",
+									"});",
+									"",
+									"pm.test(\"Response is an error\", function() {",
+									"    test.assertValidErrorResponse(/access denied/i);",
+									"});"
+								],
+								"type": "text/javascript"
+							}
+						}
+					],
+					"request": {
+						"method": "POST",
+						"header": [],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n    \"origin\": \"https://www.google.com\"\n}",
+							"options": {
+								"raw": {
+									"language": "json"
+								}
+							}
+						},
+						"url": {
+							"raw": "{{baseUrl}}/links",
+							"host": [
+								"{{baseUrl}}"
+							],
+							"path": [
+								"links"
+							]
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "should not be able to update a link",
+					"event": [
+						{
+							"listen": "prerequest",
+							"script": {
+								"exec": [
+									""
+								],
+								"type": "text/javascript"
+							}
+						},
+						{
+							"listen": "test",
+							"script": {
+								"exec": [
+									"test.postman(pm)",
+									"",
+									"pm.test(\"Status code is 403\", function() {",
+									"    pm.response.to.have.status(403);",
+									"});",
+									"",
+									"pm.test(\"Response is an error\", function() {",
+									"    test.assertValidErrorResponse(/access denied/i);",
+									"});"
+								],
+								"type": "text/javascript"
+							}
+						}
+					],
+					"request": {
+						"method": "PATCH",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json",
+								"type": "text"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n    \"backhalf\": \"test-link-Z6uxw8Q5uk\"\n}"
+						},
+						"url": {
+							"raw": "{{baseUrl}}/links/:backhalf",
+							"host": [
+								"{{baseUrl}}"
+							],
+							"path": [
+								"links",
+								":backhalf"
+							],
+							"variable": [
+								{
+									"key": "backhalf",
+									"value": "test-link-HMGeUdkrz2"
+								}
+							]
+						}
+					},
+					"response": []
+				}
+			],
+			"event": [
+				{
+					"listen": "prerequest",
+					"script": {
+						"type": "text/javascript",
+						"exec": [
+							"test.postman(pm)",
+							"test.before()",
+							"test.user(2).setActive()"
+						]
+					}
+				},
+				{
+					"listen": "test",
+					"script": {
+						"type": "text/javascript",
+						"exec": [
+							""
+						]
+					}
+				}
+			]
+		},
+		{
+			"name": "AWS auth",
+			"item": [
+				{
+					"name": "Delete user",
+					"event": [
+						{
+							"listen": "prerequest",
+							"script": {
+								"exec": [
+									"if (!pm.variables.has(\"userNo\")) {",
+									"    console.log(\"** AWS AUTH BEGIN **\")",
+									"    pm.variables.set(\"userNo\", 0)",
+									"}",
+									"",
+									"const userNo = pm.variables.get(\"userNo\")",
+									"test.postman(pm)",
+									"test.user(userNo).setActive()"
+								],
+								"type": "text/javascript"
+							}
+						},
+						{
+							"listen": "test",
+							"script": {
+								"exec": [
+									"test.postman(pm)",
+									"",
+									"if (pm.response.code === 200) {",
+									"  console.log(`Test user ${pm.variables.get(\"testEmail\")} deleted`)",
+									"}",
+									"",
+									"const userNo = pm.variables.get(\"userNo\")",
+									"if (test.user(userNo + 1) !== undefined) {",
+									"   pm.variables.set(\"userNo\", userNo + 1)",
+									"   postman.setNextRequest(\"Delete user\")",
+									"} else {",
+									"    console.log(\"** AWS AUTH END **\")",
+									"}"
+								],
+								"type": "text/javascript"
+							}
+						}
+					],
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "X-Amz-Target",
+								"value": "AWSCognitoIdentityProviderService.AdminDeleteUser",
+								"type": "text"
+							},
+							{
+								"key": "Content-Type",
+								"value": "application/x-amz-json-1.1",
+								"type": "text"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n    \"Username\": \"{{testUser}}\",\n    \"UserPoolId\": \"{{cognitoUserPoolId}}\"\n}\n",
+							"options": {
+								"raw": {
+									"language": "json"
+								}
+							}
+						},
+						"url": {
+							"raw": "https://cognito-idp.{{awsRegion}}.amazonaws.com/",
+							"protocol": "https",
+							"host": [
+								"cognito-idp",
+								"{{awsRegion}}",
+								"amazonaws",
+								"com"
+							],
+							"path": [
+								""
+							]
+						}
+					},
+					"response": []
+				}
+			],
 			"auth": {
-				"type": "noauth"
+				"type": "awsv4",
+				"awsv4": [
+					{
+						"key": "service",
+						"value": "cognito-idp",
+						"type": "string"
+					},
+					{
+						"key": "region",
+						"value": "{{awsRegion}}",
+						"type": "string"
+					},
+					{
+						"key": "secretKey",
+						"value": "{{secretAccessKey}}",
+						"type": "string"
+					},
+					{
+						"key": "accessKey",
+						"value": "{{accessKey}}",
+						"type": "string"
+					}
+				]
 			},
 			"event": [
 				{
@@ -1280,9 +1765,7 @@
 					"script": {
 						"type": "text/javascript",
 						"exec": [
-							"var testUserName = pm.variables.get(\"testUserName\");",
-							"var testUserPassword = pm.variables.get(\"testUserPass\");",
-							"auth.loginAndReset(testUserName, testUserPassword, pm);"
+							""
 						]
 					}
 				},
@@ -1298,66 +1781,106 @@
 			]
 		}
 	],
+	"auth": {
+		"type": "bearer",
+		"bearer": [
+			{
+				"key": "token",
+				"value": "{{idToken}}",
+				"type": "string"
+			}
+		]
+	},
 	"event": [
 		{
 			"listen": "prerequest",
 			"script": {
 				"type": "text/javascript",
 				"exec": [
-					"auth = {",
-					"    loginAndReset: function (username, password, pm) {",
-					"        console.log(`Logging in as ${username}`);",
-					"        const awsRegion = pm.environment.get('awsRegion');",
-					"        const clientId = pm.environment.get('cognitoClientId');",
-					"        pm.sendRequest({",
-					"            url: `https://cognito-idp.${awsRegion}.amazonaws.com/`,",
-					"            method: 'POST',",
-					"            header: {",
-					"                'X-Amz-Target': 'AWSCognitoIdentityProviderService.InitiateAuth',",
-					"                'Content-Type': 'application/x-amz-json-1.1'",
-					"            },",
-					"            ...JSONBody({",
-					"                AuthParameters: {",
-					"                    \"USERNAME\": username,",
-					"                    \"PASSWORD\": password",
-					"                },",
-					"                AuthFlow: \"USER_PASSWORD_AUTH\",",
-					"                ClientId: clientId",
-					"            }),",
-					"        }, function (err, res) {",
-					"            if (err) {",
-					"                console.error(err);",
-					"            } else if (res.code !== 200) {",
-					"                console.error(res.json().message);",
-					"            } else {",
-					"                const idToken = res.json().AuthenticationResult.IdToken",
-					"                console.debug(`Logged in with id_token=${idToken}`);",
-					"                pm.variables.set(\"cognitoIdToken\", idToken);",
-					"                pm.request.headers.add({key: 'Authorization', value: `Bearer ${idToken}`});",
-					"                api.deleteAll(pm);",
-					"            }",
-					"        });",
-					"    }",
-					"}",
-					"",
 					"const mandatoryFields = ['url', 'origin', 'backhalf', 'created_at'];",
 					"",
-					"testUtils = {",
-					"    assertValidLinkInResponse: function (expected, pm) {",
-					"        const response = pm.response.json();",
-					"        pm.expect(response)",
-					"            .to.be.an('object')",
-					"            .and.to.have.keys(mandatoryFields);",
-					"        pm.expect(response).to.have.property('origin', expected.origin);",
-					"    }, ",
+					"function deleteAll(user) {",
+					"    console.log(\"Clearing user data\");",
+					"    return pm.sendRequest({",
+					"        url: pm.environment.get('baseUrl') + `/links`,",
+					"        method: 'DELETE',",
+					"        header: {",
+					"            'authorization': 'Bearer ' + user.getIdToken()",
+					"        },",
+					"    }, handleRes);",
+					"}",
 					"",
-					"     assertValidCustomLinkInResponse: function (expected, pm) {",
-					"        const response = pm.response.json();",
-					"        assertValidCustomLink(response, expected, pm);",
+					" function createLink(user, origin, backhalf) {",
+					"    if (!backhalf) {",
+					"        console.log(`Creating custom link '${backhalf}' pointing to '${origin}'`);",
+					"    } else {",
+					"            console.log(`Creating link pointing to '${origin}'`);",
+					"    }",
+					"    pm.sendRequest({",
+					"        url: pm.environment.get('baseUrl') + '/links',",
+					"        method: 'POST',",
+					"        header: {",
+					"            'content-type': 'application/json',",
+					"            'authorization': 'Bearer ' + user.getIdToken()",
+					"        },",
+					"        ...JSONBody({origin, backhalf}),",
+					"    }, function(err, res) {",
+					"        handleRes(err, res);",
+					"        if (res.code === 201) {",
+					"            const backhalf = res.json().backhalf;",
+					"            console.log(`User ${user.email} created link ${backhalf}`);",
+					"            pm.variables.set('createdLink', backhalf);",
+					"        }",
+					"    });",
+					"}",
+					"",
+					"test = {",
+					"      postman: function(p) {",
+					"        pm = p",
+					"      },",
+					"      user: function(n) {",
+					"        const testUsers = JSON.parse(pm.variables.get(`testUsers`))",
+					"        const testEmails = JSON.parse(pm.variables.get(`testEmails`))",
+					"        if (n >= testUsers.length) {",
+					"            return;",
+					"        }",
+					"        return {",
+					"            name: testUsers[n],",
+					"            email: testEmails[n],",
+					"            setIdToken: function(token) {",
+					"                pm.variables.set(`idToken${n}`, token)",
+					"            },",
+					"            getIdToken: function() {",
+					"                return pm.variables.get(`idToken${n}`)",
+					"            },",
+					"            setActive: function() {",
+					"                pm.variables.set(\"idToken\", pm.variables.get(`idToken${n}`))",
+					"                pm.variables.set(\"testUser\", testUsers[n])",
+					"                pm.variables.set(\"testEmail\", testEmails[n])",
+					"            },",
+					"            createLink: function(origin, backhalf) {",
+					"              createLink(this, origin, backhalf)  ",
+					"            },",
+					"            deleteAll: function() {",
+					"                deleteAll(this)",
+					"            }",
+					"        }",
 					"    },",
-					"",
-					"",
-					"    assertValidCustomLink: function (object, expected, pm) {",
+					"    before: function() {",
+					"        console.log(`** before ** ${request.name}`)",
+					"    },",
+					"    after: function() {",
+					"        console.log(`** after ** ${request.name}`)",
+					"    },",
+					"    runIf: function(condition, testName, testFn) {",
+					"        (condition ? pm.test : pm.test.skip)(testName, testFn)",
+					"    },",
+					"    skipCurrentRequest: function() {",
+					"        console.log(`Skipped '${request.name}'`)",
+					"        pm.request.url = \"postman-echo.com/get\"",
+					"        pm.request.method = \"get\"",
+					"    },",
+					"    assertValidCustomLink: function (object, expected) {",
 					"        pm.expect(object)",
 					"            .to.be.an('object')",
 					"            .and.to.have.keys(mandatoryFields.concat('user'));",
@@ -1365,8 +1888,7 @@
 					"        pm.expect(object).to.have.property('backhalf', expected.backhalf);",
 					"        pm.expect(object).to.have.property('user', expected.user);",
 					"    },",
-					"",
-					"    assertValidUpdatedLinkInResponse: function (expected, pm) {",
+					"    assertValidUpdatedLinkInResponse: function (expected) {",
 					"        const response = pm.response.json();",
 					"        pm.expect(response)",
 					"            .to.be.an('object')",
@@ -1375,69 +1897,12 @@
 					"        pm.expect(response).to.have.property('backhalf', expected.backhalf);",
 					"        pm.expect(response).to.have.property('user', expected.user);",
 					"    }, ",
-					"",
-					"    assertValidErrorResponse: function (message, pm) {",
+					"    assertValidErrorResponse: function (message) {",
 					"        const response = pm.response.json();",
 					"        pm.expect(response)",
 					"            .to.be.an('object')",
 					"            .and.to.have.property('message')",
 					"                .to.match(message);",
-					"    }",
-					"}",
-					"",
-					"api = {",
-					"    deleteLink: function (link, pm) {",
-					"        console.log(`Deleting link '${link}'`)",
-					"        return pm.sendRequest({",
-					"            url: pm.environment.get('baseUrl') + `/links/${link}`,",
-					"            method: 'DELETE',",
-					"            header: {",
-					"                'Authorization': 'Bearer ' + pm.variables.get('cognitoIdToken')",
-					"            },",
-					"        }, handleRes);",
-					"    },",
-					"",
-					"    deleteAll: function (pm) {",
-					"        console.log(\"Clearing user data\");",
-					"        return pm.sendRequest({",
-					"            url: pm.environment.get('baseUrl') + `/links`,",
-					"            method: 'DELETE',",
-					"            header: {",
-					"                'Authorization': 'Bearer ' + pm.variables.get('cognitoIdToken')",
-					"            },",
-					"        }, handleRes);",
-					"    },",
-					"",
-					"    createCustomLink: function (origin, backhalf, pm) {",
-					"        console.log(`Creating custom link '${backhalf}' pointing to '${origin}'`);",
-					"        pm.sendRequest({",
-					"            url: pm.environment.get('baseUrl') + '/links',",
-					"            method: 'POST',",
-					"            header: {",
-					"                'content-type': 'application/json',",
-					"                'Authorization': 'Bearer ' + pm.variables.get('cognitoIdToken')",
-					"            },",
-					"            ...JSONBody({origin, backhalf}),",
-					"        }, handleRes);",
-					"    },",
-					"",
-					"    createLink: function (origin, pm) {",
-					"        console.log(`Creating link pointing to '${origin}'`);",
-					"        pm.sendRequest({",
-					"            url: pm.environment.get('baseUrl') + '/public/links',",
-					"            method: 'POST',",
-					"            header: {",
-					"                'content-type': 'application/json',",
-					"            },",
-					"            ...JSONBody({origin}),",
-					"        }, function(err, res) {",
-					"            handleRes(err, res);",
-					"            if (res.code === 201) {",
-					"                const backhalf = res.json().backhalf;",
-					"                console.log(`Created link ${backhalf}`);",
-					"                pm.variables.set('createdLink', backhalf);",
-					"            }",
-					"        });",
 					"    }",
 					"}",
 					"",
@@ -1472,19 +1937,16 @@
 	],
 	"variable": [
 		{
-			"key": "testUserName",
-			"value": "it_user",
-			"type": "string"
+			"key": "testUsers",
+			"value": "[\"testuser1\", \"testuser2\", \"testuser3\"]"
 		},
 		{
-			"key": "testUserPass",
-			"value": "yourPa$sword12345",
-			"type": "string"
+			"key": "testEmails",
+			"value": "[\"test1@migueli.to\", \"test2@migueli.to\", \"test@gmail.com\"]"
 		},
 		{
-			"key": "testUserEmail",
-			"value": "it-testing@postman.co",
-			"type": "string"
+			"key": "testPassword",
+			"value": "yourPa$sword12345"
 		}
 	]
 }

@@ -14,22 +14,27 @@ provider:
   runtime: python3.8
   region: ${opt:region, 'eu-west-1'}
   stage: ${opt:stage, 'dev'}
+  logs:
+    restApi: ${self:custom.logs.${self:provider.stage}}
   environment:
     BUCKET_NAME: "${self:custom.bucketName}"
-    TABLE_NAME: "${self:custom.tableName}"
+    LINKS_TABLE: "${self:custom.linksTable}"
+    USERS_TABLE: "${self:custom.usersTable}"
+    UNIQUES_TABLE: "${self:custom.uniquesTable}"
+    COUNTERS_TABLE: "${self:custom.countersTable}"
   apiGateway:
     shouldStartNameWithService: true
     request:
       schemas:
-        create-link-public-model:
-          name: CreateLinkPublic
-          schema: ${file(models/create-link-public.schema.json)}
         create-link-model:
           name: CreateLink
           schema: ${file(models/create-link.schema.json)}
         edit-link-model:
           name: EditLink
           schema: ${file(models/edit-link.schema.json)}
+        create-user:
+          name: CreateUser
+          schema: ${file(models/create-user.schema.json)}
   iam:
     role:
       statements:
@@ -42,23 +47,51 @@ provider:
           Resource: "arn:aws:s3:::${self:custom.bucketName}/*"
         - Effect: "Allow"
           Action:
-            - "dynamodb:GetItem"
+            - "dynamodb:UpdateItem"
+          Resource:
+            - "arn:aws:dynamodb:*:*:table/${self:custom.countersTable}"
+        - Effect: "Allow"
+          Action:
             - "dynamodb:PutItem"
+          Resource:
+            - "arn:aws:dynamodb:*:*:table/${self:custom.linksTable}"
+            - "arn:aws:dynamodb:*:*:table/${self:custom.usersTable}"
+            - "arn:aws:dynamodb:*:*:table/${self:custom.uniquesTable}"
+            - "arn:aws:dynamodb:*:*:table/${self:custom.countersTable}"
+        - Effect: "Allow"
+          Action:
             - "dynamodb:DeleteItem"
-            - "dynamodb:Query"
+          Resource:
+            - "arn:aws:dynamodb:*:*:table/${self:custom.linksTable}"
+            - "arn:aws:dynamodb:*:*:table/${self:custom.usersTable}"
+            - "arn:aws:dynamodb:*:*:table/${self:custom.uniquesTable}"
+        - Effect: "Allow"
+          Action:
             - "dynamodb:Scan"
-            - "dynamodb:BatchWriteItem"
-          Resource: "arn:aws:dynamodb:*:*:table/${self:custom.tableName}"
+            - "dynamodb:GetItem"
+          Resource:
+            - "arn:aws:dynamodb:*:*:table/${self:custom.linksTable}"
+            - "arn:aws:dynamodb:*:*:table/${self:custom.usersTable}"
         - Effect: "Allow"
           Action:
             - "dynamodb:Query"
-          Resource: "arn:aws:dynamodb:*:*:table/${self:custom.tableName}/index/User-index"
+            - "dynamodb:BatchWriteItem"
+          Resource: "arn:aws:dynamodb:*:*:table/${self:custom.linksTable}"
+        - Effect: "Allow"
+          Action:
+            - "dynamodb:Query"
+          Resource:
+            - "arn:aws:dynamodb:*:*:table/${self:custom.linksTable}/index/User-index"
+            - "arn:aws:dynamodb:*:*:table/${self:custom.usersTable}/index/Email-index"
 
 custom:
   stacks:
     dev: dev
     v1: pro
     v2: pro
+  logs:
+    dev: false
+    v1: true
   cors:
     origin:
       dev: 'http://localhost:8080'
@@ -67,7 +100,10 @@ custom:
   stack: ${self:custom.stacks.${self:provider.stage}}
   corsOrigin: ${self:custom.cors.origin.${self:provider.stage}}
   bucketName: ${cf:${self:app}-resources-${self:custom.stack}.RedirectBucketName}
-  tableName: ${cf:${self:app}-resources-${self:custom.stack}.DynamoDBTableName}
+  linksTable: ${cf:${self:app}-resources-${self:custom.stack}.LinksTable}
+  usersTable: ${cf:${self:app}-resources-${self:custom.stack}.UsersTable}
+  uniquesTable: ${cf:${self:app}-resources-${self:custom.stack}.UniquesTable}
+  countersTable: ${cf:${self:app}-resources-${self:custom.stack}.CountersTable}
   customDomain:
     domainName: api.${cf:${self:app}-dns.RootDomain}
     certificateArn: ${env:CERTIFICATE_ARN}
@@ -77,14 +113,102 @@ custom:
 package:
   patterns:
     - '!**/*'
-    - src/api.py
-    - src/repo.py
-    - src/link.py
-    - src/validators.py
+    - src/user/user.py
+    - src/user/repo.py
+    - src/user/api.py
+    - src/link/link.py
+    - src/link/repo.py
+    - src/link/api.py
+    - src/link/validators.py
 
 functions:
-  info:
-    handler: src/api.get_info
+  createUser:
+    handler: src/user/api.create_user
+    description: Creates a user with the given role
+    events:
+      - http:
+          path: /admin/users
+          integration: lambda
+          method: post
+          request:
+            schemas:
+              application/json: create-user
+            template:
+              application/x-www-form-urlencoded: null
+              application/json: '{
+                "data": $input.json("$"),
+                "authUser": "$context.authorizer.claims.email"
+              }'
+            passThrough: NEVER
+          response:
+            statusCodes:
+              201:
+                pattern: ''
+              400:
+                pattern: '.*(ValidationError|ApplicationError).*'
+                template: '{ "message": "$input.path("$.errorMessage")" }'
+              403:
+                pattern: '.*AuthorizationError.*'
+                template: '{ "message": "this operation is only intended for admin users" }'
+          authorizer:
+            name: CognitoAuthorizer
+            type: COGNITO_USER_POOLS
+            arn: "${cf:${self:app}-resources-${self:custom.stack}.UserPoolArn}"
+  listUsers:
+    handler: src/user/api.list_users
+    description: List all the users
+    events:
+      - http:
+          path: /admin/users
+          integration: lambda
+          method: get
+          request:
+            template:
+              application/x-www-form-urlencoded: null
+              application/json: '{ "authUser": "$context.authorizer.claims.email" }'
+            passThrough: NEVER
+          response:
+            statusCodes:
+              200:
+                pattern: ''
+              403:
+                pattern: '.*AuthorizationError.*'
+                template: '{ "message": "this operation is only intended for admin users" }'
+          authorizer:
+            name: CognitoAuthorizer
+            type: COGNITO_USER_POOLS
+            arn: "${cf:${self:app}-resources-${self:custom.stack}.UserPoolArn}"
+  deleteUser:
+    handler: src/user/api.delete_user
+    description: Delete the user identified by the given id
+    events:
+      - http:
+          path: /admin/users/{userId}
+          integration: lambda
+          method: delete
+          request:
+            template:
+              application/x-www-form-urlencoded: null
+              application/json: '{
+                "userId": "$input.params().path.get("userId")",
+                "authUser": "$context.authorizer.claims.email"
+            }'
+            passThrough: NEVER
+          response:
+            statusCodes:
+              204:
+                pattern: ''
+              404:
+                pattern: ''
+              403:
+                pattern: '.*AuthorizationError.*'
+                template: '{ "message": "this operation is only intended for admin users" }'
+          authorizer:
+            name: CognitoAuthorizer
+            type: COGNITO_USER_POOLS
+            arn: "${cf:${self:app}-resources-${self:custom.stack}.UserPoolArn}"
+  apiInfo:
+    handler: src/link/api.get_info
     description: Returns relevant information about this service such as the base URL
     events:
       - http:
@@ -96,33 +220,10 @@ functions:
             statusCodes:
               200:
                 pattern: ''
-  create:
-    handler: src/api.create_link
+  createLink:
+    handler: src/link/api.create_link
     description: Create a new link pointing to the URL provided
     events:
-      - http:
-          path: /public/links
-          integration: lambda
-          method: post
-          cors:
-            origin: '${self:custom.corsOrigin}'
-          request:
-            schemas:
-              application/json: create-link-public-model
-            template:
-              application/x-www-form-urlencoded: null
-              application/json: '{ "data": $input.json("$") }'
-            passThrough: NEVER
-          response:
-            statusCodes:
-              201:
-                pattern: ''
-              400:
-                pattern: '.*ValidationError.*'
-                template: '{ "message": "$input.path("$.errorMessage")" }'
-              500:
-                pattern: 'An error occurred.*when calling.*'
-                template: '{ "message": "$input.path("$.errorMessage")" }'
       - http:
           path: /links
           integration: lambda
@@ -136,7 +237,7 @@ functions:
               application/x-www-form-urlencoded: null
               application/json: '{
                 "data": $input.json("$"),
-                "user": "$context.authorizer.claims.email"
+                "authUser": "$context.authorizer.claims.email"
               }'
             passThrough: NEVER
           response:
@@ -146,6 +247,9 @@ functions:
               400:
                 pattern: '.*(ValidationError|ApplicationError).*'
                 template: '{ "message": "$input.path("$.errorMessage")" }'
+              403:
+                pattern: '.*AuthorizationError.*'
+                template: '{ "message": "$input.path("$.errorMessage")" }'
               500:
                 pattern: 'An error occurred.*when calling.*'
                 template: '{ "message": "$input.path("$.errorMessage")" }'
@@ -153,8 +257,8 @@ functions:
             name: CognitoAuthorizer
             type: COGNITO_USER_POOLS
             arn: "${cf:${self:app}-resources-${self:custom.stack}.UserPoolArn}"
-  list:
-    handler: src/api.list_links
+  listLinks:
+    handler: src/link/api.list_links
     description: List the links owned by the current user
     events:
       - http:
@@ -166,11 +270,14 @@ functions:
           request:
             template:
               application/x-www-form-urlencoded: null
-              application/json: '{ "user": "$context.authorizer.claims.email" }'
+              application/json: '{ "authUser": "$context.authorizer.claims.email" }'
           response:
             statusCodes:
               200:
                 pattern: ''
+              403:
+                pattern: '.*AuthorizationError.*'
+                template: '{ "message": "$input.path("$.errorMessage")" }'
               500:
                 pattern: 'An error occurred.*when calling.*'
                 template: '{ "message": "$input.path("$.errorMessage")" }'
@@ -178,9 +285,9 @@ functions:
             name: CognitoAuthorizer
             type: COGNITO_USER_POOLS
             arn: "${cf:${self:app}-resources-${self:custom.stack}.UserPoolArn}"
-  delete:
-    handler: src/api.delete_link
-    description: Delete the link identified by its backhalf only if owned by the current user
+  deleteLink:
+    handler: src/link/api.delete_link
+    description: Deletes the link identified by its backhalf only if owned by the current user
     events:
       - http:
           path: /links/{backhalf}
@@ -193,7 +300,7 @@ functions:
               application/x-www-form-urlencoded: null
               application/json: '{
                 "backhalf": "$input.params().path.get("backhalf")",
-                "user": "$context.authorizer.claims.email"
+                "authUser": "$context.authorizer.claims.email"
               }'
           response:
             statusCodes:
@@ -201,7 +308,7 @@ functions:
                 pattern: ''
               403:
                 pattern: '.*AuthorizationError.*'
-                template: '{ "message": "this link cannot be deleted by this user" }'
+                template: '{ "message": "$input.path("$.errorMessage")" }'
               500:
                 pattern: 'An error occurred.*when calling.*'
                 template: '{ "message": "$input.path("$.errorMessage")" }'
@@ -209,8 +316,8 @@ functions:
             name: CognitoAuthorizer
             type: COGNITO_USER_POOLS
             arn: "${cf:${self:app}-resources-${self:custom.stack}.UserPoolArn}"
-  deleteAll:
-    handler: src/api.delete_all
+  deleteAllLinks:
+    handler: src/link/api.delete_all
     description: Delete all the links owned by the current user
     events:
       - http:
@@ -223,12 +330,15 @@ functions:
             template:
               application/x-www-form-urlencoded: null
               application/json: '{
-                "user": "$context.authorizer.claims.email"
+                "authUser": "$context.authorizer.claims.email"
               }'
           response:
             statusCodes:
               204:
                 pattern: ''
+              403:
+                pattern: '.*AuthorizationError.*'
+                template: '{ "message": "$input.path("$.errorMessage")" }'
               500:
                 pattern: 'An error occurred.*when calling.*'
                 template: '{ "message": "$input.path("$.errorMessage")" }'
@@ -236,8 +346,8 @@ functions:
             name: CognitoAuthorizer
             type: COGNITO_USER_POOLS
             arn: "${cf:${self:app}-resources-${self:custom.stack}.UserPoolArn}"
-  edit:
-    handler: src/api.edit_link
+  editLink:
+    handler: src/link/api.edit_link
     description: Edit the link identified by its backhalf only if owned by the current user
     events:
       - http:
@@ -253,7 +363,7 @@ functions:
               application/x-www-form-urlencoded: null
               application/json: '{
                 "backhalf": "$input.params().path.get("backhalf")",
-                "user": "$context.authorizer.claims.email",
+                "authUser": "$context.authorizer.claims.email",
                 "data": $input.json("$")
               }'
             passThrough: NEVER
@@ -266,7 +376,7 @@ functions:
                 template: '{ "message": "$input.path("$.errorMessage")" }'
               403:
                 pattern: '.*AuthorizationError.*'
-                template: '{ "message": "this link cannot be edited by this user" }'
+                template: '{ "message": "$input.path("$.errorMessage")" }'
               500:
                 pattern: 'An error occurred.*when calling.*'
                 template: '{ "message": "$input.path("$.errorMessage")" }'

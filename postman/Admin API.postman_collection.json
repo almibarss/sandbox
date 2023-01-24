@@ -1,53 +1,13 @@
 {
 	"info": {
-		"_postman_id": "77e03b2e-1131-44c2-98a1-dc50fa66db0b",
-		"name": "Link API",
+		"_postman_id": "2dbfd6ad-3cbb-4d47-a2cc-5e488d7dbe3a",
+		"name": "Admin API",
 		"schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json",
 		"_exporter_id": "9513392"
 	},
 	"item": [
 		{
-			"name": "Get info",
-			"event": [
-				{
-					"listen": "prerequest",
-					"script": {
-						"exec": [
-							""
-						],
-						"type": "text/javascript"
-					}
-				},
-				{
-					"listen": "test",
-					"script": {
-						"exec": [
-							""
-						],
-						"type": "text/javascript"
-					}
-				}
-			],
-			"request": {
-				"auth": {
-					"type": "noauth"
-				},
-				"method": "GET",
-				"header": [],
-				"url": {
-					"raw": "{{baseUrl}}/info",
-					"host": [
-						"{{baseUrl}}"
-					],
-					"path": [
-						"info"
-					]
-				}
-			},
-			"response": []
-		},
-		{
-			"name": "Create a custom link",
+			"name": "Grant access to user",
 			"event": [
 				{
 					"listen": "prerequest",
@@ -73,7 +33,7 @@
 				"header": [],
 				"body": {
 					"mode": "raw",
-					"raw": "{\n    \"origin\": \"https://www.google.com\",\n    \"backhalf\": \"google\"\n}",
+					"raw": "{\n    \"email\": \"miguel.perez1@intelygenz.com\"\n}",
 					"options": {
 						"raw": {
 							"language": "json"
@@ -81,19 +41,65 @@
 					}
 				},
 				"url": {
-					"raw": "{{baseUrl}}/links",
+					"raw": "{{baseUrl}}/admin/users",
 					"host": [
 						"{{baseUrl}}"
 					],
 					"path": [
-						"links"
+						"admin",
+						"users"
 					]
 				}
 			},
 			"response": []
 		},
 		{
-			"name": "List my links",
+			"name": "Revoke access to user",
+			"event": [
+				{
+					"listen": "prerequest",
+					"script": {
+						"exec": [
+							""
+						],
+						"type": "text/javascript"
+					}
+				},
+				{
+					"listen": "test",
+					"script": {
+						"exec": [
+							""
+						],
+						"type": "text/javascript"
+					}
+				}
+			],
+			"request": {
+				"method": "DELETE",
+				"header": [],
+				"url": {
+					"raw": "{{baseUrl}}/admin/users/:id",
+					"host": [
+						"{{baseUrl}}"
+					],
+					"path": [
+						"admin",
+						"users",
+						":id"
+					],
+					"variable": [
+						{
+							"key": "id",
+							"value": "1"
+						}
+					]
+				}
+			},
+			"response": []
+		},
+		{
+			"name": "List granted users",
 			"event": [
 				{
 					"listen": "prerequest",
@@ -118,159 +124,13 @@
 				"method": "GET",
 				"header": [],
 				"url": {
-					"raw": "{{baseUrl}}/links",
+					"raw": "{{baseUrl}}/admin/users",
 					"host": [
 						"{{baseUrl}}"
 					],
 					"path": [
-						"links"
-					]
-				}
-			},
-			"response": []
-		},
-		{
-			"name": "Delete link",
-			"event": [
-				{
-					"listen": "prerequest",
-					"script": {
-						"exec": [
-							""
-						],
-						"type": "text/javascript"
-					}
-				},
-				{
-					"listen": "test",
-					"script": {
-						"exec": [
-							""
-						],
-						"type": "text/javascript"
-					}
-				}
-			],
-			"request": {
-				"method": "DELETE",
-				"header": [
-					{
-						"key": "Content-Type",
-						"value": "application/json",
-						"type": "text"
-					}
-				],
-				"url": {
-					"raw": "{{baseUrl}}/links/:backhalf",
-					"host": [
-						"{{baseUrl}}"
-					],
-					"path": [
-						"links",
-						":backhalf"
-					],
-					"variable": [
-						{
-							"key": "backhalf",
-							"value": "google"
-						}
-					]
-				}
-			},
-			"response": []
-		},
-		{
-			"name": "Delete all my links",
-			"event": [
-				{
-					"listen": "prerequest",
-					"script": {
-						"exec": [
-							""
-						],
-						"type": "text/javascript"
-					}
-				},
-				{
-					"listen": "test",
-					"script": {
-						"exec": [
-							""
-						],
-						"type": "text/javascript"
-					}
-				}
-			],
-			"request": {
-				"method": "DELETE",
-				"header": [
-					{
-						"key": "Content-Type",
-						"value": "application/json",
-						"type": "text"
-					}
-				],
-				"url": {
-					"raw": "{{baseUrl}}/links",
-					"host": [
-						"{{baseUrl}}"
-					],
-					"path": [
-						"links"
-					]
-				}
-			},
-			"response": []
-		},
-		{
-			"name": "Edit link",
-			"event": [
-				{
-					"listen": "prerequest",
-					"script": {
-						"exec": [
-							""
-						],
-						"type": "text/javascript"
-					}
-				},
-				{
-					"listen": "test",
-					"script": {
-						"exec": [
-							""
-						],
-						"type": "text/javascript"
-					}
-				}
-			],
-			"request": {
-				"method": "PATCH",
-				"header": [
-					{
-						"key": "Content-Type",
-						"value": "application/json",
-						"type": "text"
-					}
-				],
-				"body": {
-					"mode": "raw",
-					"raw": "{\n    \"origin\": \"https://www.serverless.com/\"\n}"
-				},
-				"url": {
-					"raw": "{{baseUrl}}/links/:backhalf",
-					"host": [
-						"{{baseUrl}}"
-					],
-					"path": [
-						"links",
-						":backhalf"
-					],
-					"variable": [
-						{
-							"key": "backhalf",
-							"value": "n3SZI5e"
-						}
+						"admin",
+						"users"
 					]
 				}
 			},

@@ -1,12 +1,14 @@
 import re
 import string
-import src.repo as repo
+
+import src.link.repo as repo
+
+from src.link.validators import url as is_valid_url
 
 from dataclasses import asdict, dataclass
 from datetime import datetime
 from itertools import chain
 from random import choice
-from src.validators import url as is_valid_url
 
 BACKHALF_MIN_LEN = 1
 BACKHALF_MAX_LEN = 20

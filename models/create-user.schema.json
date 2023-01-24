@@ -1,0 +1,17 @@
+{
+  "$schema": "http://json-schema.org/draft-04/schema#",
+  "title": "create-user",
+  "description": "Create user",
+  "type": "object",
+  "required": [ "email" ],
+  "properties": {
+    "email": {
+      "type": "string",
+      "description": "The email address of the user"
+    },
+    "role": {
+      "type": "string",
+      "description": "ADMIN or USER"
+    }
+  }
+}

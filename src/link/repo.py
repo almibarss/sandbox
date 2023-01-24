@@ -1,15 +1,14 @@
 import boto3
-
-from src.link import Link
 from boto3.dynamodb.conditions import Key, Attr
 from botocore.exceptions import ClientError
-from os import environ as env
 from datetime import datetime
+from os import environ as env
+from src.link.link import Link
 from typing import Dict, List
 
 
 bucket = boto3.resource('s3').Bucket(env['BUCKET_NAME'])
-table = boto3.resource('dynamodb').Table(env['TABLE_NAME'])
+table = boto3.resource('dynamodb').Table(env['LINKS_TABLE'])
 
 
 class DuplicateKey(Exception):
